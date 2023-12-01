@@ -45,5 +45,5 @@ jobs:
           dbt deps
           dbt --version
 
-      - name: Run dbt
-        run: dbt build
+      - name: dbt tests
+        run: dbt test
