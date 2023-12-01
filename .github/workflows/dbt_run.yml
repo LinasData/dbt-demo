@@ -1,46 +1,49 @@
-# This is a basic workflow to help you get started with Actions
+name: dbt BigQuery
 
-name: DBT TESTS
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: ['main']
+    paths:
+      - models/**
+      - seeds/**
+      - tests/**
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+env:
+  # dbt env variables used in your dbt profiles.yml
+  DBT_PROFILES_DIR: ./
+  DBT_GOOGLE_PROJECT: ${{ vars.DBT_GOOGLE_PROJECT }}
+  DBT_GOOGLE_DATASET: ${{ vars.DBT_GOOGLE_DATASET }}
+  DBT_GOOGLE_KEYFILE: /tmp/google/google-service-account.json
+  
+  # the contents of the keyfile pulled from GitHub Actions secrets 
+  KEYFILE_CONTENTS: ${{secrets.KEYFILE_CONTENTS}}
+
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
+    name: install and build dbt
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
-          
-      # Runs dbt tests
-      - name: Set up Python
+      # Prep Google keyfile
+      - run: mkdir -p "$(dirname $DBT_GOOGLE_KEYFILE)" 
+      - run: echo "$KEYFILE_CONTENTS" > $DBT_GOOGLE_KEYFILE
+    
+      - name: Install Python 3.9
         uses: actions/setup-python@v2
         with:
-          python-version: '3.8'
-      - name: Install DBT
-        run: pip install dbt
-      - name: Run DBT Tests
-        run: dbt test --profiles-dir .
+          python-version: 3.9.16
+
+      - name: Checkout Repo
+        uses: actions/checkout@master
+
+      - name: Install dbt
+        run: |
+          pip install dbt-bigquery
+          dbt deps
+          dbt --version
+
+      - name: Run dbt
+        run: dbt build
